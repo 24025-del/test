@@ -10,9 +10,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
     proxy: {
       '/api': {
-        // Target: Where your 'api' folder is located on Apache
-        // Correctly pointing to the project folder
-        target: 'http://127.0.0.1/vital-connect/api',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

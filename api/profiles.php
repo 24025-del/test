@@ -1,28 +1,25 @@
 <?php
 /**
- * api/profiles.php
+ * api/profiles.php - Profile Controller
  */
 
-error_reporting(0);
-ini_set('display_errors', 0);
-ob_start();
-
 require_once 'db.php';
+session_start();
 
 $action = $_GET['action'] ?? '';
-
-function cleanSendResponse($data, $statusCode = 200) {
-    if (ob_get_length()) ob_clean(); 
-    sendResponse($data, $statusCode);
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if ($action === 'get_profile') {
         $userId = $_GET['userId'] ?? null;
-        if (!$userId) cleanSendResponse(null, 400);
+        if (!$userId) sendResponse(["status" => "error", "message" => "Missing User ID"], 400);
+
+        // Security: Ensure users can only get their own profile unless they are admin
+        if (!isset($_SESSION['user_id']) || ($_SESSION['user_id'] !== $userId && $_SESSION['role'] !== 'admin')) {
+            sendResponse(["status" => "error", "message" => "Unauthorized"], 401);
+        }
 
         $stmt = $pdo->prepare("
-            SELECT p.*, u.is_banned 
+            SELECT p.*, u.is_banned, u.email as user_email
             FROM profiles p 
             JOIN users u ON p.user_id = u.id 
             WHERE p.user_id = ?
@@ -37,48 +34,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 $profile['is_available'] = 1;
             }
         }
-        cleanSendResponse($profile);
+        sendResponse($profile);
     }
 
     if ($action === 'search_donors') {
         $bloodType = $_GET['bloodType'] ?? '';
-        // Robustness: Handle '+' being converted to space in query parameters
         $bloodType = str_replace(' ', '+', $bloodType);
         $cityId = $_GET['cityId'] ?? '';
         
-        $query = "SELECT p.*, u.is_banned 
-                  FROM profiles p 
+        $query = "SELECT p.* FROM profiles p 
                   JOIN users u ON p.user_id = u.id
                   WHERE p.role = 'donor' AND u.is_banned = 0 
                   AND (p.is_available = 1 OR (p.cooldown_end_date IS NOT NULL AND p.cooldown_end_date <= CURRENT_TIMESTAMP))";
         $params = [];
 
         if ($bloodType) {
-            $query .= " AND blood_type = ?";
+            $query .= " AND p.blood_type = ?";
             $params[] = $bloodType;
         }
         if ($cityId) {
-            $query .= " AND city_id = ?";
+            $query .= " AND p.city_id = ?";
             $params[] = $cityId;
         }
 
         $stmt = $pdo->prepare($query);
         $stmt->execute($params);
-        cleanSendResponse($stmt->fetchAll());
-    }
-    
-    // Simple endpoint to get all users by role (for testing)
-    $role = $_GET['role'] ?? '';
-    if ($role) {
-        $stmt = $pdo->prepare("
-            SELECT p.*, u.is_banned 
-            FROM profiles p 
-            JOIN users u ON p.user_id = u.id 
-            WHERE p.role = ? AND u.is_banned = 0 
-            LIMIT 50
-        ");
-        $stmt->execute([$role]);
-        cleanSendResponse($stmt->fetchAll());
+        sendResponse($stmt->fetchAll());
     }
 }
 
@@ -87,8 +68,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'update_profile') {
         $profileId = $input['id'] ?? null;
         if (!$profileId) {
-            cleanSendResponse(["status" => "error", "message" => "Missing profile ID"], 400);
+            sendResponse(["status" => "error", "message" => "Missing profile ID"], 400);
         }
+        
+        // Security: Ensure users can only update their own profile
+        $stmt = $pdo->prepare("SELECT user_id FROM profiles WHERE id = ?");
+        $stmt->execute([$profileId]);
+        $owner = $stmt->fetch();
+        
+        if (!$owner || !isset($_SESSION['user_id']) || ($_SESSION['user_id'] !== $owner['user_id'] && $_SESSION['role'] !== 'admin')) {
+             sendResponse(["status" => "error", "message" => "Unauthorized"], 401);
+        }
+
         $fields = ['name', 'phone', 'city_id', 'blood_type', 'is_available'];
         $updates = [];
         $params = [];
@@ -104,9 +95,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $params[] = $profileId;
             $stmt = $pdo->prepare("UPDATE profiles SET " . implode(', ', $updates) . " WHERE id = ?");
             $stmt->execute($params);
-            cleanSendResponse(["status" => "success"]);
+            sendResponse(["status" => "success"]);
         } else {
-            cleanSendResponse(["status" => "success", "message" => "No changes"]);
+            sendResponse(["status" => "success", "message" => "No changes"]);
         }
     }
 }

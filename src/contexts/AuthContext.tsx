@@ -59,15 +59,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // Check for existing session in localStorage
-    const storedUser = localStorage.getItem('user');
-    const storedProfile = localStorage.getItem('profile');
+    const initAuth = async () => {
+      try {
+        // First try to check the actual session with the backend
+        const data = await api.auth.checkSession();
+        if (data.status === 'success' && data.user && data.profile) {
+          setUser(data.user);
+          setProfile(data.profile);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          localStorage.setItem('profile', JSON.stringify(data.profile));
+        } else {
+          // No valid session on server, clear local state
+          setUser(null);
+          setProfile(null);
+          localStorage.removeItem('user');
+          localStorage.removeItem('profile');
+        }
+      } catch (err) {
+        // If 401 or network error, check if we have stored data as a fallback
+        // but prefer server truth. For now, if server says no, we clear.
+        console.error('Session check failed:', err);
+        setUser(null);
+        setProfile(null);
+        localStorage.removeItem('user');
+        localStorage.removeItem('profile');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    if (storedUser && storedProfile) {
-      setUser(JSON.parse(storedUser));
-      setProfile(JSON.parse(storedProfile));
-    }
-    setLoading(false);
+    initAuth();
   }, []);
 
   const signIn = async (email: string, password: string) => {

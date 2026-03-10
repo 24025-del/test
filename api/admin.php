@@ -1,5 +1,15 @@
 <?php
+/**
+ * api/admin.php - Admin Controller
+ */
+
 require_once 'db.php';
+session_start();
+
+// Strict Admin Check
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+     sendResponse(["status" => "error", "message" => "Access denied. Admins only."], 403);
+}
 
 $action = $_GET['action'] ?? '';
 
@@ -28,7 +38,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (isset($input['is_banned'])) {
             try {
-                // Get user_id from profile
                 $stmt = $pdo->prepare("SELECT user_id FROM profiles WHERE id = ?");
                 $stmt->execute([$profileId]);
                 $profile = $stmt->fetch();
@@ -37,9 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $userId = $profile['user_id'];
                     $stmt = $pdo->prepare("UPDATE users SET is_banned = ? WHERE id = ?");
                     $stmt->execute([$input['is_banned'] ? 1 : 0, $userId]);
-                    
-                    // Also update profile if needed or keep it in users for auth check
-                    // The user said "Update the user record"
                     sendResponse(["status" => "success"]);
                 } else {
                     sendResponse(["status" => "error", "message" => "Profile not found"], 404);

@@ -1,11 +1,7 @@
 <?php
 /**
- * api/cities.php
+ * api/cities.php - Cities Controller
  */
-
-error_reporting(0);
-ini_set('display_errors', 0);
-ob_start();
 
 require_once 'db.php';
 
@@ -21,15 +17,9 @@ $cities = [
     ['id' => 'Néma', 'name_ar' => 'النعمة', 'name_en' => 'Néma']
 ];
 
-function cleanSendResponse($data, $statusCode = 200) {
-    if (ob_get_length()) ob_clean(); 
-    sendResponse($data, $statusCode);
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    cleanSendResponse([
+    sendResponse([
         "status" => "success",
-        "source" => "static",
         "data" => $cities
     ]);
 }

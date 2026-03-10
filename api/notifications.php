@@ -1,52 +1,51 @@
 <?php
 /**
- * api/notifications.php
+ * api/notifications.php - Notifications Controller
  */
 
-error_reporting(0);
-ini_set('display_errors', 0);
-ob_start();
-
 require_once 'db.php';
+session_start();
 
 $action = $_GET['action'] ?? '';
+$input = getJsonInput();
 
-function cleanSendResponse($data, $statusCode = 200) {
-    if (ob_get_length()) ob_clean(); 
-    sendResponse($data, $statusCode);
+if (!isset($_SESSION['user_id'])) {
+    sendResponse(["status" => "error", "message" => "Unauthorized"], 401);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $userId = $_GET['userId'] ?? null;
-    if (!$userId) cleanSendResponse([]);
+    if (!$userId) sendResponse([]);
 
-    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC");
+    // Security check: Only self or admin
+    $stmt = $pdo->prepare("SELECT user_id FROM profiles WHERE id = ?");
     $stmt->execute([$userId]);
-    cleanSendResponse($stmt->fetchAll());
+    $owner = $stmt->fetch();
+    if (!$owner || ($_SESSION['user_id'] !== $owner['user_id'] && $_SESSION['role'] !== 'admin')) {
+         sendResponse(["status" => "error", "message" => "Unauthorized"], 401);
+    }
+
+    $stmt = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 100");
+    $stmt->execute([$userId]);
+    sendResponse($stmt->fetchAll());
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $input = getJsonInput();
-    
-    if ($action === 'create_notification') {
-        $id = generateUUID();
-        $stmt = $pdo->prepare("INSERT INTO notifications (id, user_id, title_ar, title_en, message_ar, message_en, type, related_request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([
-            $id,
-            $input['user_id'] ?? null,
-            $input['title_ar'] ?? '',
-            $input['title_en'] ?? '',
-            $input['message_ar'] ?? '',
-            $input['message_en'] ?? '',
-            $input['type'] ?? 'info',
-            $input['related_request_id'] ?? null
-        ]);
-        cleanSendResponse(["status" => "success", "id" => $id]);
-    }
-
     if ($action === 'mark_read') {
+        $id = $input['id'] ?? null;
+        if (!$id) sendResponse(["status" => "error", "message" => "Missing ID"], 400);
+
+        // Security check
+        $stmt = $pdo->prepare("SELECT user_id FROM notifications WHERE id = ?");
+        $stmt->execute([$id]);
+        $notif = $stmt->fetch();
+        
+        if (!$notif || ($_SESSION['user_id'] !== $notif['user_id'] && $_SESSION['role'] !== 'admin')) {
+             sendResponse(["status" => "error", "message" => "Unauthorized"], 401);
+        }
+
         $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = ?");
-        $stmt->execute([$input['id'] ?? null]);
-        cleanSendResponse(["status" => "success"]);
+        $stmt->execute([$id]);
+        sendResponse(["status" => "success"]);
     }
 }

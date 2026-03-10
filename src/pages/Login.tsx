@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,6 +26,14 @@ const Login = () => {
     email: '',
     password: '',
   });
+
+  useEffect(() => {
+    setFormData({
+      email: '',
+      password: '',
+    });
+  }, []);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
@@ -117,8 +125,12 @@ const Login = () => {
             </CardDescription>
           </CardHeader>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} autoComplete="off">
             <CardContent className="space-y-4">
+              {/* Dummy fields to avoid browser autofill */}
+              <input type="text" name="fakeusernameremembered" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
+              <input type="password" name="fakepasswordremembered" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
+
               <div className="space-y-2">
                 <Label htmlFor="email">{t('email')}</Label>
                 <div className="relative">
@@ -127,6 +139,7 @@ const Login = () => {
                     id="email"
                     name="email"
                     type="email"
+                    autoComplete="off"
                     placeholder={dir === 'rtl' ? 'أدخل بريدك الإلكتروني' : 'Enter your email'}
                     value={formData.email}
                     onChange={handleChange}
@@ -144,6 +157,7 @@ const Login = () => {
                     id="password"
                     name="password"
                     type="password"
+                    autoComplete="new-password"
                     placeholder={dir === 'rtl' ? 'أدخل كلمة المرور' : 'Enter your password'}
                     value={formData.password}
                     onChange={handleChange}
