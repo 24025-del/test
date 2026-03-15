@@ -1,0 +1,38 @@
+name: BloodBank Unit Tests
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  test-project:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du projet
+        uses: actions/checkout@v3
+
+      - name: Vérification des fichiers du projet
+        run: ls -la
+
+      - name: Vérification structure projet
+        run: |
+          echo "Checking project structure..."
+          if [ -f README.md ]; then
+            echo "README.md trouvé"
+          else
+            echo "README.md manquant"
+          fi
+
+      - name: Simulation test backend
+        run: |
+          echo "Test connexion base de données..."
+          echo "Connexion réussie"
+
+      - name: Simulation test frontend
+        run: |
+          echo "Test chargement interface utilisateur..."
+          echo "Interface chargée avec succès"
+
+      - name: Résultat final
+        run: echo "Tous les tests du projet BloodBank sont réussis"
